@@ -1,6 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
-
+from datetime import datetime
 from typing import List
 
 import torch
@@ -32,13 +32,18 @@ class LLaMA:
 
         total_len = min(params.max_seq_len, max_gen_len + max_prompt_size)
 
-        tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
+        if torch.cuda.is_available():
+            tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
+        else:
+            tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).long()
         for k, t in enumerate(prompt_tokens):
             tokens[k, : len(t)] = torch.tensor(t).long()
         input_text_mask = tokens != self.tokenizer.pad_id
         start_pos = min_prompt_size
         prev_pos = 0
+        print(f'start_pos = {start_pos}, total_len = {total_len}')
         for cur_pos in range(start_pos, total_len):
+            print(f'[{datetime.now().strftime("%I:%M:%S %p")}]cur_pos: {cur_pos}')
             logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
             if temperature > 0:
                 probs = torch.softmax(logits / temperature, dim=-1)

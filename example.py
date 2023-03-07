@@ -1,6 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
-
+from datetime import datetime
 from typing import Tuple
 import os
 import sys
@@ -20,9 +20,14 @@ def setup_model_parallel() -> Tuple[int, int]:
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
     world_size = int(os.environ.get("WORLD_SIZE", -1))
 
-    torch.distributed.init_process_group("nccl")
+    if torch.cuda.is_available():
+        torch.distributed.init_process_group("nccl")
+    else:
+        torch.distributed.init_process_group("gloo")
     initialize_model_parallel(world_size)
-    torch.cuda.set_device(local_rank)
+
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
 
     # seed must be the same in all processes
     torch.manual_seed(1)
@@ -53,7 +58,7 @@ def load(
     )
     tokenizer = Tokenizer(model_path=tokenizer_path)
     model_args.vocab_size = tokenizer.n_words
-    torch.set_default_tensor_type(torch.cuda.HalfTensor)
+    #torch.set_default_tensor_type(torch.cuda.HalfTensor)
     model = Transformer(model_args)
     torch.set_default_tensor_type(torch.FloatTensor)
     model.load_state_dict(checkpoint, strict=False)
@@ -106,14 +111,28 @@ plush girafe => girafe peluche
 
 cheese =>""",
     ]
+    print(f"Started generating at " + datetime.now().strftime("%I:%M:%S %p"))
     results = generator.generate(
         prompts, max_gen_len=256, temperature=temperature, top_p=top_p
     )
-
+    print(f"Finished generating at " + datetime.now().strftime("%I:%M:%S %p"))
     for result in results:
         print(result)
         print("\n==================================\n")
 
 
 if __name__ == "__main__":
+    print(sys.argv)
+    if len(sys.argv) == 1:
+        models_dir = "models"
+        os.environ["RANK"] = "0"
+        os.environ["WORLD_SIZE"] = "1"
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "2222"
+        sys.argv.append("--ckpt_dir")
+        sys.argv.append(f"{models_dir}/7B")
+        sys.argv.append("--tokenizer_path")
+        sys.argv.append(f"{models_dir}/tokenizer.model")
+        sys.argv.append(f'--max_seq_len')
+        sys.argv.append(f'91')
     fire.Fire(main)
