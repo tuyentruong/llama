@@ -124,7 +124,7 @@ cheese =>""",
 if __name__ == "__main__":
     print(sys.argv)
     if len(sys.argv) == 1:
-        models_dir = "models"
+        models_dir = "/Users/tuyen/git/data/llama"
         os.environ["RANK"] = "0"
         os.environ["WORLD_SIZE"] = "1"
         os.environ["MASTER_ADDR"] = "localhost"
